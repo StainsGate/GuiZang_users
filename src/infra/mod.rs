@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
-use gz_core::AppState;
+use gz_core::{AppConfig, AppState};
 use gz_web::AppError;
+use serde_json::Value;
 use sqlx::PgPool;
 
 pub mod jwt;
@@ -24,11 +25,13 @@ pub enum InfraError {
 }
 
 impl JwtConfig {
-    pub fn from_env() -> Result<Self, InfraError> {
-        let secret =
-            std::env::var("JWT_SECRET").map_err(|_| InfraError::MissingEnv("JWT_SECRET"))?;
+    pub fn from_app_config(cfg: &AppConfig) -> Result<Self, InfraError> {
+        let secret = read_secret(cfg)
+            .or_else(|| std::env::var("JWT_SECRET").ok())
+            .ok_or(InfraError::MissingEnv("jwt_secret or JWT_SECRET"))?;
+
         if secret.is_empty() {
-            return Err(InfraError::InvalidEnv("JWT_SECRET"));
+            return Err(InfraError::InvalidEnv("jwt_secret or JWT_SECRET"));
         }
 
         let access_ttl_seconds = std::env::var("ACCESS_TOKEN_TTL_SECONDS")
@@ -62,4 +65,11 @@ pub async fn must_jwt_config(state: &AppState) -> Result<Arc<JwtConfig>, AppErro
         .get::<JwtConfig>()
         .await
         .ok_or_else(|| AppError::internal("missing JwtConfig in AppState"))
+}
+
+fn read_secret(cfg: &AppConfig) -> Option<String> {
+    cfg.extra.get("jwt_secret").and_then(|v| match v {
+        Value::String(s) => Some(s.clone()),
+        _ => None,
+    })
 }

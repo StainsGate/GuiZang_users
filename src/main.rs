@@ -27,12 +27,13 @@ async fn main() -> Result<(), CoreError> {
     let (cfg, env) = AppConfig::load()?;
     let state = AppState::new(Arc::new(cfg.clone()));
 
-    let database_url =
-        std::env::var("DATABASE_URL").map_err(|_| CoreError::serve(MissingEnv("DATABASE_URL")))?;
-    let max_connections: u32 = std::env::var("DATABASE_MAX_CONNECTIONS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(10);
+    let database_url = cfg
+        .db
+        .url
+        .clone()
+        .or_else(|| std::env::var("DATABASE_URL").ok())
+        .ok_or_else(|| CoreError::serve(MissingEnv("db.url or DATABASE_URL")))?;
+    let max_connections: u32 = cfg.db.max_connections;
 
     let pool: PgPool = PgPoolOptions::new()
         .max_connections(max_connections)
@@ -40,7 +41,7 @@ async fn main() -> Result<(), CoreError> {
         .await
         .map_err(CoreError::serve)?;
 
-    let jwt_cfg = infra::JwtConfig::from_env().map_err(CoreError::serve)?;
+    let jwt_cfg = infra::JwtConfig::from_app_config(&cfg).map_err(CoreError::serve)?;
     state.insert(pool).await;
     state.insert(jwt_cfg).await;
 

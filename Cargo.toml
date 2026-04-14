@@ -6,9 +6,9 @@ rust-version = "1.78"
 
 [dependencies]
 axum = "0.8"
-gz-core = { git = "ssh://git@github.com/StainsGate/GuiZang-.git", tag = "0.1.0" }
-gz-observe = { git = "ssh://git@github.com/StainsGate/GuiZang-.git", tag = "0.1.0" }
-gz-web = { git = "ssh://git@github.com/StainsGate/GuiZang-.git", tag = "0.1.0" }
+gz-core = { git = "ssh://git@github.com/StainsGate/GuiZang-.git", tag = "0.1.1" }
+gz-observe = { git = "ssh://git@github.com/StainsGate/GuiZang-.git", tag = "0.1.1" }
+gz-web = { git = "ssh://git@github.com/StainsGate/GuiZang-.git", tag = "0.1.1" }
 argon2 = "0.5"
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
