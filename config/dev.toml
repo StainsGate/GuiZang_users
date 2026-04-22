@@ -1,5 +1,10 @@
 jwt_secret = "vYf7S8+vG6X8uN5J0/fW9Z2bH5mRkLpT4YqN7zX1A8M="
 
+[otel]
+enabled = true
+exporter_otlp_endpoint = "http://localhost:4317"
+service_name = "gz-users"
+
 [server]
 addr = "127.0.0.1:8080"
 

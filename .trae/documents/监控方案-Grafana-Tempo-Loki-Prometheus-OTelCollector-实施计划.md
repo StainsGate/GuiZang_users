@@ -151,7 +151,8 @@ Collector 配置要点（当前文件已满足）：
 
 * metrics → prometheus exporter：`endpoint=0.0.0.0:9464`（Prometheus 抓 `otel-collector:9464`）
 
-* logs → loki exporter：`endpoint=http://loki:3100/loki/api/v1/push`
+* logs → `otlp_http` exporter（Loki 原生 OTLP 接收）：`endpoint=http://loki:3100/otlp`
+  * Loki 2.9.x 需要启用 `limits_config.allow_structured_metadata: true`，否则会拒绝 OTLP 日志负载
 
 * processors：包含 `attributes/redact`（删掉 `password/secret/token/authorization` 等敏感字段）
 
@@ -238,4 +239,3 @@ Collector 配置要点（当前文件已满足）：
 * traces 不串联：需要做 header context 提取（见 4.1 的“注意”）
 
 * Grafana 没有数据源：确认 `deploy/observability/grafana/provisioning` 目录已正确挂载（见 compose volumes）
-

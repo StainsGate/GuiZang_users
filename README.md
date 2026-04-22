@@ -154,11 +154,54 @@ cargo run
 
 1. 停止：
 
-```pwoershell
+```powershell
 Get-NetTCPConnection -LocalPort 8080 | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }
 ```
 
 默认监听地址来自 `config/default.toml` / `config/<env>.toml` 的 `server.addr`。
+
+## Observability（Grafana + Tempo + Loki + Prometheus + OTel Collector）
+
+本地观测栈复用 `deploy/observability` 目录。
+
+1. 启动观测栈（在仓库根目录）：
+
+```powershell
+Set-Location .\deploy\observability
+docker compose up -d
+docker compose ps
+```
+
+1. 常用命令：
+
+```powershell
+docker compose logs -f otel-collector
+docker compose logs -f grafana
+docker compose stop
+docker compose start
+docker compose down
+```
+
+1. 关键端口：
+
+- Grafana: `http://localhost:3000`
+- Prometheus: `http://localhost:9090`
+- Loki: `http://localhost:3100`
+- Tempo: `http://localhost:3200`
+- OTel Collector: `4317` (gRPC), `4318` (HTTP), `9464` (Prometheus exporter)
+
+1. 启动服务并开启 OTEL（PowerShell）：
+
+```powershell
+cargo run
+```
+
+1. 验证链路：
+
+- 请求 `GET /health`、`GET /v1/auth/me` 或其他 API 产生 traces/logs/metrics。
+- 在 Grafana Explore 中选择 Tempo 查看 `service.name=gz-users` 链路。
+- 在 Grafana Explore 中选择 Loki 检索 `gz-users` 日志。
+- 在 Prometheus 查看 `up` 与 OTel Collector 导出的指标。
 
 ## 权限与引导
 
