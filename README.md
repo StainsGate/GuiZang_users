@@ -26,6 +26,9 @@
   - `DELETE /v1/roles/{id}`
   - `PUT /v1/roles/{id}/permissions`
   - `PUT /v1/users/{id}/roles`
+- OpenAPI 文档
+  - `GET /v1/swagger-ui/`（Swagger UI）
+  - `GET /api-docs/openapi.json`（OpenAPI JSON）
 
 ## 技术栈
 
@@ -38,11 +41,13 @@
 ## 数据库
 
 迁移文件位于 `migrations/`：
+
 - `20260414120000_init.sql`：初始化表结构
 - `20260414121000_seed_rbac.sql`：写入基础权限与 `admin` 角色
 
 主要表：
-- `users`：用户主体与基础资料（含软删除、审计字段、row_version）
+
+- `users`：用户主体与基础资料（含软删除、审计字段、row\_version）
 - `user_credentials`：密码哈希/登录锁定等敏感认证信息
 - `roles` / `permissions` / `user_roles` / `role_permissions`：RBAC
 - `refresh_tokens`：刷新令牌（仅存哈希）
@@ -53,20 +58,36 @@
 运行环境通过 `APP_ENV` 选择配置文件（例如 `config/dev.toml`），框架默认支持 `APP__SERVER__ADDR` 形式的环境变量覆盖。
 
 服务数据库配置建议放在 `config/<env>.toml` 的 `[db]`（例如 `config/dev.toml`），也可以用环境变量覆盖：
+
 - `APP__DB__URL`：PostgreSQL 连接串
 - `APP__DB__MAX_CONNECTIONS`：连接池最大连接数
 
 JWT 密钥建议放在 `config/<env>.toml` 的 `jwt_secret`，也可以用环境变量覆盖：
+
 - `APP__JWT_SECRET`：JWT 签名密钥（推荐覆盖方式）
 - `JWT_SECRET`：JWT 签名密钥（兼容兜底）
 
+示例（`config/dev.toml`）：
+
+```toml
+jwt_secret = "change-me"
+
+[server]
+addr = "127.0.0.1:8080"
+
+[db]
+url = "postgres://postgres:postgres@127.0.0.1:5432/gz_users"
+max_connections = 10
+```
+
 服务额外依赖以下环境变量：
+
 - `ACCESS_TOKEN_TTL_SECONDS`：Access Token TTL（可选，默认 900）
 - `REFRESH_TOKEN_TTL_SECONDS`：Refresh Token TTL（可选，默认 2592000）
 
 ## 本地开发
 
-1) 启动 Postgres（Docker Compose）：
+1. 启动 Postgres（Docker Compose）：
 
 ```powershell
 docker compose up -d
@@ -83,7 +104,7 @@ docker compose down
 docker compose down -v
 ```
 
-2) 配置 JWT 密钥：
+1. 配置 JWT 密钥：
 
 - 方式 A：在 `config/<env>.toml` 设置 `jwt_secret`（推荐）
 - 方式 B：用环境变量覆盖（仅对当前 PowerShell 会话生效）：
@@ -92,26 +113,26 @@ docker compose down -v
 $env:APP__JWT_SECRET = "change-me"
 ```
 
-3) 执行迁移（任选其一）：
+1. 执行迁移（任选其一）：
 
 - 使用你熟悉的迁移工具执行 `migrations/*.sql`
 - 或通过 SQLx CLI 执行迁移（推荐）
 
 ### 使用 SQLx CLI 执行迁移
 
-1) 安装（仅需一次）：
+1. 安装（仅需一次）：
 
 ```powershell
 cargo install sqlx-cli --no-default-features --features postgres,rustls
 ```
 
-2) 设置 `DATABASE_URL`（SQLx CLI 读取该环境变量）：
+1. 设置 `DATABASE_URL`（SQLx CLI 读取该环境变量）：
 
 ```powershell
 $env:DATABASE_URL = "postgres://postgres:postgres@127.0.0.1:5432/gz_users"
 ```
 
-3) 创建数据库并执行迁移：
+1. 创建数据库并执行迁移：
 
 ```powershell
 sqlx database create
@@ -125,10 +146,16 @@ sqlx migrate info
 sqlx migrate revert
 ```
 
-4) 启动：
+1. 启动：
 
 ```powershell
 cargo run
+```
+
+1. 停止：
+
+```pwoershell
+Get-NetTCPConnection -LocalPort 8080 | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }
 ```
 
 默认监听地址来自 `config/default.toml` / `config/<env>.toml` 的 `server.addr`。

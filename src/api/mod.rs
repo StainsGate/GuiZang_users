@@ -1,12 +1,50 @@
 use axum::{routing::get, Router};
 use gz_core::AppState;
 use gz_web::ApiResponse;
+use utoipa::OpenApi;
 
 mod auth;
 mod extractors;
 mod permissions;
 mod roles;
 mod users;
+
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "gz-users 用户微服务 API",
+        description = "用户注册/登录/刷新令牌、用户管理、RBAC（角色/权限）接口文档",
+        version = "0.1.0"
+    ),
+    tags(
+        (name = "System", description = "系统接口"),
+        (name = "Auth", description = "认证与会话"),
+        (name = "Users", description = "用户管理"),
+        (name = "Roles", description = "角色管理"),
+        (name = "Permissions", description = "权限查询")
+    ),
+    paths(
+    ping,
+    auth::register,
+    auth::login,
+    auth::refresh,
+    auth::logout,
+    auth::me,
+    users::list_users,
+    users::create_user,
+    users::get_user,
+    users::update_user,
+    users::delete_user,
+    roles::list_roles,
+    roles::create_role,
+    roles::get_role,
+    roles::update_role,
+    roles::delete_role,
+    roles::replace_role_permissions,
+    roles::replace_user_roles,
+    permissions::list_permissions
+))]
+pub struct ApiDoc;
 
 pub fn router() -> Router<AppState> {
     Router::new()
@@ -17,6 +55,14 @@ pub fn router() -> Router<AppState> {
         .merge(permissions::router())
 }
 
+#[utoipa::path(
+    get,
+    path = "/v1/ping",
+    tag = "System",
+    responses(
+        (status = 200, description = "连通性检查（pong）")
+    )
+)]
 async fn ping() -> ApiResponse<&'static str> {
     ApiResponse::ok("pong")
 }

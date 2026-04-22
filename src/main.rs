@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{extract::State, response::IntoResponse, routing::get, Router};
 use gz_core::{App, AppConfig, AppState, CoreError};
 use gz_observe::{init_tracing, TracingConfig};
-use gz_web::{middleware, ApiResponse, RouterAppStateExt};
+use gz_web::{middleware, swagger::SwaggerRouterExt, ApiResponse, RouterAppStateExt};
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
 mod api;
@@ -47,7 +47,8 @@ async fn main() -> Result<(), CoreError> {
 
     let router: Router<AppState> = Router::new()
         .route("/health", get(health))
-        .nest("/v1", api::router());
+        .nest("/v1", api::router())
+        .with_swagger_ui::<api::ApiDoc>("/v1/swagger-ui/");
     let router = router.with_app_state(state);
     let router = middleware::apply(router, middleware::MiddlewareConfig::default());
 

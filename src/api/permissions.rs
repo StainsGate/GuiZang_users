@@ -2,6 +2,7 @@ use axum::{extract::State, routing::get, Router};
 use gz_core::AppState;
 use gz_web::ApiResponse;
 use serde::Serialize;
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{api::extractors::AuthUser, error, infra, repo, service};
@@ -10,15 +11,25 @@ pub fn router() -> Router<AppState> {
     Router::new().route("/permissions", get(list_permissions))
 }
 
-#[derive(Debug, Serialize)]
-struct PermissionView {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct PermissionView {
+    /// 权限 ID
     id: Uuid,
+    /// 权限码（例如 users.read）
     code: String,
+    /// 权限描述（可选）
     description: Option<String>,
+    /// 乐观锁版本号（row_version）
     row_version: i64,
 }
 
-async fn list_permissions(
+#[utoipa::path(
+    get,
+    path = "/v1/permissions",
+    tag = "Permissions",
+    responses((status = 200, description = "查询权限列表"))
+)]
+pub(crate) async fn list_permissions(
     State(state): State<AppState>,
     user: AuthUser,
 ) -> Result<ApiResponse<Vec<PermissionView>>, gz_web::AppError> {

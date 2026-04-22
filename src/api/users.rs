@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use gz_core::AppState;
 use gz_web::ApiResponse;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{api::extractors::AuthUser, error, infra, repo, service};
@@ -15,13 +16,13 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/users", get(list_users).post(create_user))
         .route(
-            "/users/:id",
+            "/users/{id}",
             get(get_user).patch(update_user).delete(delete_user),
         )
 }
 
 #[derive(Debug, Deserialize)]
-struct UsersQuery {
+pub(crate) struct UsersQuery {
     email: Option<String>,
     phone: Option<String>,
     status: Option<String>,
@@ -30,37 +31,57 @@ struct UsersQuery {
     after_id: Option<Uuid>,
 }
 
-#[derive(Debug, Serialize)]
-struct UsersListView {
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct UsersListView {
+    /// 用户列表
     items: Vec<service::auth::UserView>,
+    /// 下一页游标：created_at（RFC3339）
     next_after_created_at: Option<DateTime<Utc>>,
+    /// 下一页游标：id
     next_after_id: Option<Uuid>,
 }
 
-#[derive(Debug, Deserialize)]
-struct CreateUserBody {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct CreateUserBody {
+    /// 邮箱（可选，邮箱或手机号至少提供一个）
     email: Option<String>,
+    /// 手机号（可选，邮箱或手机号至少提供一个）
     phone: Option<String>,
+    /// 显示名称
     display_name: String,
+    /// 头像 URL
     avatar_url: Option<String>,
+    /// 状态（例如 active/disabled）
     status: Option<String>,
+    /// 初始密码（可选）
     password: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct UpdateUserBody {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct UpdateUserBody {
+    /// 显示名称（可选）
     display_name: Option<String>,
+    /// 头像 URL（可选）
     avatar_url: Option<String>,
+    /// 状态（可选，例如 active/disabled）
     status: Option<String>,
+    /// 乐观锁版本号（row_version）
     row_version: i64,
 }
 
-#[derive(Debug, Deserialize)]
-struct DeleteUserBody {
+#[derive(Debug, Deserialize, ToSchema)]
+pub(crate) struct DeleteUserBody {
+    /// 乐观锁版本号（row_version）
     row_version: i64,
 }
 
-async fn list_users(
+#[utoipa::path(
+    get,
+    path = "/v1/users",
+    tag = "Users",
+    responses((status = 200, description = "查询用户列表"))
+)]
+pub(crate) async fn list_users(
     State(state): State<AppState>,
     user: AuthUser,
     Query(q): Query<UsersQuery>,
@@ -104,7 +125,14 @@ async fn list_users(
     }))
 }
 
-async fn create_user(
+#[utoipa::path(
+    post,
+    path = "/v1/users",
+    tag = "Users",
+    request_body = CreateUserBody,
+    responses((status = 200, description = "创建用户"))
+)]
+pub(crate) async fn create_user(
     State(state): State<AppState>,
     user: AuthUser,
     Json(req): Json<CreateUserBody>,
@@ -175,7 +203,16 @@ async fn create_user(
     Ok(ApiResponse::ok(user_row_to_view(row)))
 }
 
-async fn get_user(
+#[utoipa::path(
+    get,
+    path = "/v1/users/{id}",
+    params(
+        ("id" = Uuid, Path, description = "User id")
+    ),
+    tag = "Users",
+    responses((status = 200, description = "查询用户详情"))
+)]
+pub(crate) async fn get_user(
     State(state): State<AppState>,
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -196,7 +233,17 @@ async fn get_user(
     Ok(ApiResponse::ok(user_row_to_view(row)))
 }
 
-async fn update_user(
+#[utoipa::path(
+    patch,
+    path = "/v1/users/{id}",
+    params(
+        ("id" = Uuid, Path, description = "User id")
+    ),
+    tag = "Users",
+    request_body = UpdateUserBody,
+    responses((status = 200, description = "更新用户"))
+)]
+pub(crate) async fn update_user(
     State(state): State<AppState>,
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -228,7 +275,17 @@ async fn update_user(
     Ok(ApiResponse::ok(user_row_to_view(updated)))
 }
 
-async fn delete_user(
+#[utoipa::path(
+    delete,
+    path = "/v1/users/{id}",
+    params(
+        ("id" = Uuid, Path, description = "User id")
+    ),
+    tag = "Users",
+    request_body = DeleteUserBody,
+    responses((status = 200, description = "删除用户（软删除）"))
+)]
+pub(crate) async fn delete_user(
     State(state): State<AppState>,
     user: AuthUser,
     Path(id): Path<Uuid>,

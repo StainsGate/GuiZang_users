@@ -697,7 +697,7 @@ dependencies = [
 [[package]]
 name = "gz-core"
 version = "0.1.0"
-source = "git+ssh://git@github.com/StainsGate/GuiZang-.git?tag=0.1.1#f7e70453cea058fe6711eec3e4a43094ccd4a438"
+source = "git+ssh://git@github.com/StainsGate/GuiZang-.git?tag=0.1.2#fcd89827fa590c64c0ac0da5b80dc4a5a90d4950"
 dependencies = [
  "async-trait",
  "axum",
@@ -712,7 +712,7 @@ dependencies = [
 [[package]]
 name = "gz-observe"
 version = "0.1.0"
-source = "git+ssh://git@github.com/StainsGate/GuiZang-.git?tag=0.1.1#f7e70453cea058fe6711eec3e4a43094ccd4a438"
+source = "git+ssh://git@github.com/StainsGate/GuiZang-.git?tag=0.1.2#fcd89827fa590c64c0ac0da5b80dc4a5a90d4950"
 dependencies = [
  "anyhow",
  "tokio",
@@ -741,13 +741,14 @@ dependencies = [
  "sqlx",
  "thiserror",
  "tokio",
+ "utoipa",
  "uuid",
 ]
 
 [[package]]
 name = "gz-web"
 version = "0.1.0"
-source = "git+ssh://git@github.com/StainsGate/GuiZang-.git?tag=0.1.1#f7e70453cea058fe6711eec3e4a43094ccd4a438"
+source = "git+ssh://git@github.com/StainsGate/GuiZang-.git?tag=0.1.2#fcd89827fa590c64c0ac0da5b80dc4a5a90d4950"
 dependencies = [
  "async-trait",
  "axum",
@@ -2670,6 +2671,7 @@ dependencies = [
  "quote",
  "regex",
  "syn",
+ "uuid",
 ]
 
 [[package]]

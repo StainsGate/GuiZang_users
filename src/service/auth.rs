@@ -4,6 +4,7 @@ use rand_core::{OsRng, RngCore};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Transaction};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{error, infra, repo};
@@ -34,29 +35,43 @@ pub struct LogoutInput {
     pub refresh_token: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct TokenPair {
+    /// 访问令牌（JWT）
     pub access_token: String,
+    /// 访问令牌有效期（秒）
     pub expires_in: i64,
+    /// 刷新令牌（仅返回一次）
     pub refresh_token: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct UserView {
+    /// 用户 ID
     pub id: Uuid,
+    /// 邮箱（可选）
     pub email: Option<String>,
+    /// 手机号（可选）
     pub phone: Option<String>,
+    /// 显示名称
     pub display_name: String,
+    /// 头像 URL（可选）
     pub avatar_url: Option<String>,
+    /// 状态（例如 active/disabled）
     pub status: String,
+    /// 创建时间
     pub created_at: chrono::DateTime<Utc>,
+    /// 更新时间
     pub updated_at: chrono::DateTime<Utc>,
+    /// 乐观锁版本号（row_version）
     pub row_version: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, ToSchema)]
 pub struct AuthResult {
+    /// 用户信息
     pub user: UserView,
+    /// 令牌信息
     pub tokens: TokenPair,
 }
 
