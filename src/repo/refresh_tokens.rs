@@ -109,3 +109,25 @@ where
 
     Ok(())
 }
+
+pub async fn revoke_all_for_user(pool: &PgPool, user_id: Uuid) -> Result<(), sqlx::Error> {
+    revoke_all_for_user_in(pool, user_id).await
+}
+
+pub async fn revoke_all_for_user_in<'e, E>(ex: E, user_id: Uuid) -> Result<(), sqlx::Error>
+where
+    E: PgExecutor<'e>,
+{
+    sqlx::query(
+        r#"
+        update refresh_tokens
+        set revoked_at = now()
+        where user_id = $1 and revoked_at is null
+        "#,
+    )
+    .bind(user_id)
+    .execute(ex)
+    .await?;
+
+    Ok(())
+}

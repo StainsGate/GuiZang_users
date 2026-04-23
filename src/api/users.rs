@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use chrono::{DateTime, Utc};
@@ -15,10 +15,8 @@ use crate::{api::extractors::AuthUser, error, infra, repo, service};
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/users", get(list_users).post(create_user))
-        .route(
-            "/users/{id}",
-            get(get_user).patch(update_user).delete(delete_user),
-        )
+        .route("/users/{id}", get(get_user).patch(update_user))
+        .route("/users/{id}/delete", post(delete_user))
 }
 
 #[derive(Debug, Deserialize)]
@@ -276,8 +274,8 @@ pub(crate) async fn update_user(
 }
 
 #[utoipa::path(
-    delete,
-    path = "/v1/users/{id}",
+    post,
+    path = "/v1/users/{id}/delete",
     params(
         ("id" = Uuid, Path, description = "User id")
     ),

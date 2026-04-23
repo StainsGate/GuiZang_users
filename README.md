@@ -11,12 +11,13 @@
   - `POST /v1/auth/refresh`
   - `POST /v1/auth/logout`
   - `GET /v1/auth/me`
+  - 说明：`/auth/logout` 会撤销该用户全部 refresh token，并通过 `session_version` 立即使已签发的 access token 失效
 - Users（RBAC 保护）
   - `GET /v1/users`
   - `POST /v1/users`
   - `GET /v1/users/{id}`
   - `PATCH /v1/users/{id}`
-  - `DELETE /v1/users/{id}`
+  - `POST /v1/users/{id}/delete`
 - RBAC 管理（RBAC 保护）
   - `GET /v1/permissions`
   - `GET /v1/roles`

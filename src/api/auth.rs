@@ -69,6 +69,7 @@ pub(crate) struct MeView {
     path = "/v1/auth/register",
     tag = "Auth",
     request_body = RegisterBody,
+    security(()),
     responses((status = 200, description = "注册成功"))
 )]
 pub(crate) async fn register(
@@ -154,6 +155,7 @@ pub(crate) async fn register(
     path = "/v1/auth/login",
     tag = "Auth",
     request_body = LoginBody,
+    security(()),
     responses((status = 200, description = "登录成功"))
 )]
 pub(crate) async fn login(
@@ -184,6 +186,7 @@ pub(crate) async fn login(
     path = "/v1/auth/refresh",
     tag = "Auth",
     request_body = RefreshBody,
+    security(()),
     responses((status = 200, description = "刷新令牌成功"))
 )]
 pub(crate) async fn refresh(
@@ -213,6 +216,7 @@ pub(crate) async fn refresh(
     path = "/v1/auth/logout",
     tag = "Auth",
     request_body = LogoutBody,
+    security(()),
     responses((status = 200, description = "登出成功"))
 )]
 pub(crate) async fn logout(

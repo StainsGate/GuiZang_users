@@ -19,6 +19,7 @@ pub struct UserRow {
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_by: Option<Uuid>,
     pub updated_by: Option<Uuid>,
+    pub session_version: i64,
     pub row_version: i64,
 }
 
@@ -189,6 +190,43 @@ pub async fn touch_last_login(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error
     .execute(pool)
     .await?;
     Ok(())
+}
+
+pub async fn get_session_version(pool: &PgPool, id: Uuid) -> Result<Option<i64>, sqlx::Error> {
+    sqlx::query_scalar(
+        r#"
+        select session_version
+        from users
+        where id = $1 and deleted_at is null
+        "#,
+    )
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+pub async fn bump_session_version(pool: &PgPool, id: Uuid) -> Result<bool, sqlx::Error> {
+    bump_session_version_in(pool, id).await
+}
+
+pub async fn bump_session_version_in<'e, E>(ex: E, id: Uuid) -> Result<bool, sqlx::Error>
+where
+    E: PgExecutor<'e>,
+{
+    let r = sqlx::query(
+        r#"
+        update users
+        set session_version = session_version + 1,
+            updated_at = now(),
+            row_version = row_version + 1
+        where id = $1 and deleted_at is null
+        "#,
+    )
+    .bind(id)
+    .execute(ex)
+    .await?;
+
+    Ok(r.rows_affected() == 1)
 }
 
 pub async fn soft_delete(

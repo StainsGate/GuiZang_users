@@ -165,7 +165,15 @@ pub async fn register(
             })?;
     }
 
-    let tokens = issue_tokens_in_tx(&mut tx, jwt_cfg, user_id, ip, user_agent).await?;
+    let tokens = issue_tokens_in_tx(
+        &mut tx,
+        jwt_cfg,
+        user_id,
+        user.session_version,
+        ip,
+        user_agent,
+    )
+    .await?;
 
     tx.commit().await.map_err(|e| {
         error::with_context(
@@ -245,7 +253,15 @@ pub async fn login(
         )
     })?;
 
-    let tokens = issue_tokens_in_tx(&mut tx, jwt_cfg, user.id, ip, user_agent).await?;
+    let tokens = issue_tokens_in_tx(
+        &mut tx,
+        jwt_cfg,
+        user.id,
+        user.session_version,
+        ip,
+        user_agent,
+    )
+    .await?;
 
     tx.commit().await.map_err(|e| {
         error::with_context(
@@ -316,7 +332,17 @@ pub async fn refresh(
         )
     })?;
 
-    let access_token = infra::jwt::sign_access_token(existing.user_id, jwt_cfg)
+    let session_version = repo::users::get_session_version(pool, existing.user_id)
+        .await
+        .map_err(|e| {
+            error::with_context(
+                error::internal("db error"),
+                serde_json::json!({ "op": "get_session_version", "err": e.to_string() }),
+            )
+        })?
+        .ok_or_else(|| error::unauthorized("invalid refresh token"))?;
+
+    let access_token = infra::jwt::sign_access_token(existing.user_id, session_version, jwt_cfg)
         .map_err(|_| error::internal("jwt sign error"))?;
 
     Ok(TokenPair {
@@ -341,7 +367,36 @@ pub async fn logout(pool: &PgPool, input: LogoutInput) -> Result<(), gz_web::App
             )
         })?
     {
-        let _ = repo::refresh_tokens::revoke(pool, r.id).await;
+        let mut tx: Transaction<'_, Postgres> = pool.begin().await.map_err(|e| {
+            error::with_context(
+                error::internal("db error"),
+                serde_json::json!({ "op": "begin", "err": e.to_string() }),
+            )
+        })?;
+
+        repo::refresh_tokens::revoke_all_for_user_in(&mut *tx, r.user_id)
+            .await
+            .map_err(|e| {
+                error::with_context(
+                    error::internal("db error"),
+                    serde_json::json!({ "op": "revoke_all_refresh_tokens", "err": e.to_string() }),
+                )
+            })?;
+        repo::users::bump_session_version_in(&mut *tx, r.user_id)
+            .await
+            .map_err(|e| {
+                error::with_context(
+                    error::internal("db error"),
+                    serde_json::json!({ "op": "bump_session_version", "err": e.to_string() }),
+                )
+            })?;
+
+        tx.commit().await.map_err(|e| {
+            error::with_context(
+                error::internal("db error"),
+                serde_json::json!({ "op": "commit", "err": e.to_string() }),
+            )
+        })?;
     }
 
     Ok(())
@@ -385,10 +440,11 @@ async fn issue_tokens_in_tx(
     tx: &mut Transaction<'_, Postgres>,
     jwt_cfg: &infra::JwtConfig,
     user_id: Uuid,
+    session_version: i64,
     ip: Option<String>,
     user_agent: Option<String>,
 ) -> Result<TokenPair, gz_web::AppError> {
-    let access_token = infra::jwt::sign_access_token(user_id, jwt_cfg)
+    let access_token = infra::jwt::sign_access_token(user_id, session_version, jwt_cfg)
         .map_err(|_| error::internal("jwt sign error"))?;
 
     let new = new_refresh_token(jwt_cfg, user_id, ip, user_agent)?;

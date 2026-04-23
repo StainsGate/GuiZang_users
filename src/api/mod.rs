@@ -1,7 +1,8 @@
 use axum::{routing::get, Router};
 use gz_core::AppState;
 use gz_web::ApiResponse;
-use utoipa::OpenApi;
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::{openapi, Modify, OpenApi};
 
 mod auth;
 mod extractors;
@@ -15,6 +16,10 @@ mod users;
         title = "gz-users 用户微服务 API",
         description = "用户注册/登录/刷新令牌、用户管理、RBAC（角色/权限）接口文档",
         version = "0.1.0"
+    ),
+    modifiers(&ApiDocSecurity),
+    security(
+        ("bearerAuth" = [])
     ),
     tags(
         (name = "System", description = "系统接口"),
@@ -46,6 +51,23 @@ mod users;
 ))]
 pub struct ApiDoc;
 
+struct ApiDocSecurity;
+
+impl Modify for ApiDocSecurity {
+    fn modify(&self, openapi: &mut openapi::OpenApi) {
+        let components = openapi.components.get_or_insert_with(Default::default);
+        components.add_security_scheme(
+            "bearerAuth",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
+                    .build(),
+            ),
+        );
+    }
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ping", get(ping))
@@ -59,6 +81,7 @@ pub fn router() -> Router<AppState> {
     get,
     path = "/v1/ping",
     tag = "System",
+    security(()),
     responses(
         (status = 200, description = "连通性检查（pong）")
     )
