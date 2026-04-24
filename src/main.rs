@@ -1,3 +1,7 @@
+//! gz-users 服务入口（二进制 crate）。
+//!
+//! 提供用户认证（JWT + Refresh Token）、用户管理与 RBAC 能力，并暴露 OpenAPI 文档。
+#![deny(missing_docs)]
 use std::sync::Arc;
 
 use axum::{extract::State, response::IntoResponse, routing::get, Router};

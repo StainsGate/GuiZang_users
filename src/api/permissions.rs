@@ -7,6 +7,7 @@ use uuid::Uuid;
 
 use crate::{api::extractors::AuthUser, error, infra, repo, service};
 
+/// 权限查询 API 路由（RBAC 保护）。
 pub fn router() -> Router<AppState> {
     Router::new().route("/permissions", get(list_permissions))
 }

@@ -3,34 +3,55 @@ use sqlx::{PgExecutor, PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
+/// roles 表的一行记录（软删除记录默认在查询中被过滤）。
 pub struct RoleRow {
+    /// 角色 ID。
     pub id: Uuid,
+    /// 角色名称（唯一）。
     pub name: String,
+    /// 角色描述（可选）。
     pub description: Option<String>,
+    /// 创建时间。
     pub created_at: DateTime<Utc>,
+    /// 更新时间。
     pub updated_at: DateTime<Utc>,
+    /// 软删除时间（非空表示已删除）。
     pub deleted_at: Option<DateTime<Utc>>,
+    /// 创建人（可选）。
     pub created_by: Option<Uuid>,
+    /// 更新人（可选）。
     pub updated_by: Option<Uuid>,
+    /// 乐观锁版本号。
     pub row_version: i64,
 }
 
 #[derive(Debug, Clone)]
+/// 创建角色的入参（对应 roles 表 insert）。
 pub struct CreateRole {
+    /// 角色 ID。
     pub id: Uuid,
+    /// 角色名称。
     pub name: String,
+    /// 角色描述（可选）。
     pub description: Option<String>,
+    /// 创建人（可选）。
     pub created_by: Option<Uuid>,
 }
 
 #[derive(Debug, Clone)]
+/// 更新角色的入参（对应 roles 表 update）。
 pub struct UpdateRole {
+    /// 角色名称（可选）。
     pub name: Option<String>,
+    /// 角色描述（可选）。
     pub description: Option<String>,
+    /// 更新人（可选）。
     pub updated_by: Option<Uuid>,
+    /// 期望的乐观锁版本号（row_version）。
     pub expected_row_version: i64,
 }
 
+/// 查询角色列表（软删除角色不会返回）。
 pub async fn list(pool: &PgPool) -> Result<Vec<RoleRow>, sqlx::Error> {
     sqlx::query_as::<_, RoleRow>(
         r#"
@@ -44,6 +65,7 @@ pub async fn list(pool: &PgPool) -> Result<Vec<RoleRow>, sqlx::Error> {
     .await
 }
 
+/// 按角色 ID 查询角色（软删除角色不会返回）。
 pub async fn get_by_id(pool: &PgPool, id: Uuid) -> Result<Option<RoleRow>, sqlx::Error> {
     sqlx::query_as::<_, RoleRow>(
         r#"
@@ -57,6 +79,7 @@ pub async fn get_by_id(pool: &PgPool, id: Uuid) -> Result<Option<RoleRow>, sqlx:
     .await
 }
 
+/// 插入一条角色记录。
 pub async fn insert<'e, E>(ex: E, input: CreateRole) -> Result<RoleRow, sqlx::Error>
 where
     E: PgExecutor<'e>,
@@ -84,6 +107,7 @@ where
     .await
 }
 
+/// 更新角色记录（基于 row_version 乐观锁），返回更新后的行。
 pub async fn update(
     pool: &PgPool,
     id: Uuid,
@@ -113,6 +137,7 @@ pub async fn update(
     .await
 }
 
+/// 软删除角色（设置 deleted_at），基于 row_version 乐观锁。
 pub async fn soft_delete(
     pool: &PgPool,
     id: Uuid,
@@ -140,6 +165,7 @@ pub async fn soft_delete(
     Ok(r.rows_affected() == 1)
 }
 
+/// 查询用户拥有的角色名称列表。
 pub async fn list_user_roles(pool: &PgPool, user_id: Uuid) -> Result<Vec<String>, sqlx::Error> {
     let rows: Vec<(String,)> = sqlx::query_as(
         r#"
@@ -157,6 +183,7 @@ pub async fn list_user_roles(pool: &PgPool, user_id: Uuid) -> Result<Vec<String>
     Ok(rows.into_iter().map(|r| r.0).collect())
 }
 
+/// 替换角色的权限列表（先删除再插入）。
 pub async fn replace_role_permissions(
     tx: &mut Transaction<'_, Postgres>,
     role_id: Uuid,
@@ -191,6 +218,7 @@ pub async fn replace_role_permissions(
     Ok(())
 }
 
+/// 替换用户的角色列表（先删除再插入）。
 pub async fn replace_user_roles(
     tx: &mut Transaction<'_, Postgres>,
     user_id: Uuid,

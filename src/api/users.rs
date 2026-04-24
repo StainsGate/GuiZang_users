@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::{api::extractors::AuthUser, error, infra, repo, service};
 
+/// 用户管理 API 路由（RBAC 保护）。
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/users", get(list_users).post(create_user))

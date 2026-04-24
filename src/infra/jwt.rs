@@ -6,13 +6,19 @@ use uuid::Uuid;
 use crate::infra::JwtConfig;
 
 #[derive(Debug, Serialize, Deserialize)]
+/// Access token 的 JWT claims。
 pub struct AccessClaims {
+    /// 用户 ID（UUID 字符串）。
     pub sub: String,
+    /// 签发时间（Unix timestamp）。
     pub iat: i64,
+    /// 过期时间（Unix timestamp）。
     pub exp: i64,
+    /// 会话版本号（用于登出后立即失效 access token）。
     pub sv: i64,
 }
 
+/// 签发 access token（JWT）。
 pub fn sign_access_token(
     user_id: Uuid,
     session_version: i64,
@@ -35,6 +41,7 @@ pub fn sign_access_token(
     )
 }
 
+/// 校验 access token（JWT），成功返回 `(user_id, session_version)`。
 pub fn verify_access_token(
     token: &str,
     cfg: &JwtConfig,

@@ -3,30 +3,50 @@ use sqlx::{PgExecutor, PgPool};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
+/// refresh_tokens 表的一行记录（仅存 token_hash，不存明文）。
 pub struct RefreshTokenRow {
+    /// 刷新令牌记录 ID。
     pub id: Uuid,
+    /// 用户 ID。
     pub user_id: Uuid,
+    /// 刷新令牌哈希（SHA-256 hex）。
     pub token_hash: String,
+    /// 签发时间。
     pub issued_at: DateTime<Utc>,
+    /// 过期时间。
     pub expires_at: DateTime<Utc>,
+    /// 撤销时间（可选）。
     pub revoked_at: Option<DateTime<Utc>>,
+    /// 轮换后的新令牌 ID（可选）。
     pub replaced_by: Option<Uuid>,
+    /// IP（可选）。
     pub ip: Option<String>,
+    /// User-Agent（可选）。
     pub user_agent: Option<String>,
+    /// 创建时间。
     pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
+/// 新建刷新令牌记录的入参。
 pub struct NewRefreshToken {
+    /// 刷新令牌记录 ID。
     pub id: Uuid,
+    /// 用户 ID。
     pub user_id: Uuid,
+    /// 刷新令牌哈希（SHA-256 hex）。
     pub token_hash: String,
+    /// 签发时间。
     pub issued_at: DateTime<Utc>,
+    /// 过期时间。
     pub expires_at: DateTime<Utc>,
+    /// IP（可选）。
     pub ip: Option<String>,
+    /// User-Agent（可选）。
     pub user_agent: Option<String>,
 }
 
+/// 插入一条刷新令牌记录。
 pub async fn insert<'e, E>(ex: E, input: NewRefreshToken) -> Result<RefreshTokenRow, sqlx::Error>
 where
     E: PgExecutor<'e>,
@@ -52,6 +72,7 @@ where
     .await
 }
 
+/// 通过 token_hash 查询刷新令牌记录。
 pub async fn get_by_hash(
     pool: &PgPool,
     token_hash: &str,
@@ -69,10 +90,12 @@ pub async fn get_by_hash(
     .await
 }
 
+/// 撤销指定刷新令牌记录。
 pub async fn revoke(pool: &PgPool, id: Uuid) -> Result<(), sqlx::Error> {
     revoke_in(pool, id).await
 }
 
+/// 在指定执行器中撤销刷新令牌记录（事务内使用）。
 pub async fn revoke_in<'e, E>(ex: E, id: Uuid) -> Result<(), sqlx::Error>
 where
     E: PgExecutor<'e>,
@@ -90,6 +113,7 @@ where
     Ok(())
 }
 
+/// 在指定执行器中轮换刷新令牌：撤销旧记录并标记 replaced_by。
 pub async fn rotate_in<'e, E>(ex: E, old_id: Uuid, new_id: Uuid) -> Result<(), sqlx::Error>
 where
     E: PgExecutor<'e>,
@@ -110,10 +134,12 @@ where
     Ok(())
 }
 
+/// 撤销用户所有未撤销的刷新令牌记录。
 pub async fn revoke_all_for_user(pool: &PgPool, user_id: Uuid) -> Result<(), sqlx::Error> {
     revoke_all_for_user_in(pool, user_id).await
 }
 
+/// 在指定执行器中撤销用户所有未撤销的刷新令牌记录（事务内使用）。
 pub async fn revoke_all_for_user_in<'e, E>(ex: E, user_id: Uuid) -> Result<(), sqlx::Error>
 where
     E: PgExecutor<'e>,

@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use crate::{error, repo};
 
+/// 要求指定用户具备某个权限码，否则返回 403。
 pub async fn require_permission(
     pool: &PgPool,
     user_id: Uuid,

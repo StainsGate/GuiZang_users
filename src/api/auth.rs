@@ -13,6 +13,7 @@ use utoipa::ToSchema;
 
 use crate::{api::extractors::AuthUser, error, infra, repo, service};
 
+/// 认证与会话 API 路由（注册/登录/刷新/登出/当前用户）。
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/auth/register", post(register))

@@ -3,16 +3,25 @@ use serde_json::Value;
 use sqlx::{PgExecutor, PgPool};
 
 #[derive(Debug, Clone, sqlx::FromRow)]
+/// idempotency_records 表的一行记录（按 scope+key 去重）。
 pub struct IdempotencyRecordRow {
+    /// 幂等作用域（例如 "auth.register"）。
     pub scope: String,
+    /// 幂等键（来自请求头 Idempotency-Key）。
     pub key: String,
+    /// 请求内容哈希（用于检测同 key 不同请求体的冲突）。
     pub request_hash: String,
+    /// 原始响应状态码。
     pub status_code: i32,
+    /// 原始响应体（JSON）。
     pub response_body: Value,
+    /// 创建时间。
     pub created_at: DateTime<Utc>,
+    /// 过期时间（超过该时间不再视为命中）。
     pub expires_at: DateTime<Utc>,
 }
 
+/// 获取仍在有效期内的幂等记录。
 pub async fn get_valid(
     pool: &PgPool,
     scope: &str,
@@ -31,6 +40,7 @@ pub async fn get_valid(
     .await
 }
 
+/// 插入幂等记录（若已存在同 scope+key 则忽略）。
 pub async fn insert<'e, E>(
     ex: E,
     scope: &str,

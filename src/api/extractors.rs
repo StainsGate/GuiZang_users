@@ -8,7 +8,9 @@ use uuid::Uuid;
 use crate::{error, infra, repo};
 
 #[derive(Debug, Clone, Copy)]
+/// 从 `Authorization: Bearer <token>` 提取并校验后的已认证用户信息。
 pub struct AuthUser {
+    /// 用户 ID。
     pub user_id: Uuid,
 }
 

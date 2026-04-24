@@ -3,16 +3,25 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
+/// permissions 表的一行记录（软删除记录默认在查询中被过滤）。
 pub struct PermissionRow {
+    /// 权限 ID。
     pub id: Uuid,
+    /// 权限码（唯一）。
     pub code: String,
+    /// 权限描述（可选）。
     pub description: Option<String>,
+    /// 创建时间。
     pub created_at: DateTime<Utc>,
+    /// 更新时间。
     pub updated_at: DateTime<Utc>,
+    /// 软删除时间（非空表示已删除）。
     pub deleted_at: Option<DateTime<Utc>>,
+    /// 乐观锁版本号。
     pub row_version: i64,
 }
 
+/// 查询权限列表（软删除权限不会返回）。
 pub async fn list(pool: &PgPool) -> Result<Vec<PermissionRow>, sqlx::Error> {
     sqlx::query_as::<_, PermissionRow>(
         r#"
@@ -26,6 +35,7 @@ pub async fn list(pool: &PgPool) -> Result<Vec<PermissionRow>, sqlx::Error> {
     .await
 }
 
+/// 判断用户是否具备指定权限码。
 pub async fn has_permission(
     pool: &PgPool,
     user_id: Uuid,
@@ -50,6 +60,7 @@ pub async fn has_permission(
     Ok(exists.is_some())
 }
 
+/// 查询用户拥有的权限码列表。
 pub async fn list_user_permissions(
     pool: &PgPool,
     user_id: Uuid,

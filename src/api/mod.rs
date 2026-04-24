@@ -11,6 +11,7 @@ mod roles;
 mod users;
 
 #[derive(OpenApi)]
+/// 项目的 OpenAPI 文档定义（供 Swagger UI 使用）。
 #[openapi(
     info(
         title = "gz-users 用户微服务 API",

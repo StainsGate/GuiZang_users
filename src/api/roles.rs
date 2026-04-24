@@ -11,6 +11,7 @@ use uuid::Uuid;
 
 use crate::{api::extractors::AuthUser, error, infra, repo, service};
 
+/// 角色与权限管理 API 路由（RBAC 保护）。
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/roles", get(list_roles).post(create_role))

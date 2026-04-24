@@ -12,30 +12,43 @@ use crate::{error, infra, repo};
 const ADMIN_ROLE_ID: Uuid = Uuid::from_u128(1);
 
 #[derive(Debug, Clone)]
+/// 注册输入参数。
 pub struct RegisterInput {
+    /// 邮箱（可选，邮箱或手机号至少提供一个）。
     pub email: Option<String>,
+    /// 手机号（可选，邮箱或手机号至少提供一个）。
     pub phone: Option<String>,
+    /// 密码明文。
     pub password: String,
+    /// 显示名称。
     pub display_name: String,
 }
 
 #[derive(Debug, Clone)]
+/// 登录输入参数。
 pub struct LoginInput {
+    /// 登录标识（邮箱或手机号）。
     pub identifier: String,
+    /// 密码明文。
     pub password: String,
 }
 
 #[derive(Debug, Clone)]
+/// 刷新令牌输入参数。
 pub struct RefreshInput {
+    /// 刷新令牌。
     pub refresh_token: String,
 }
 
 #[derive(Debug, Clone)]
+/// 登出输入参数。
 pub struct LogoutInput {
+    /// 刷新令牌。
     pub refresh_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+/// 一对令牌：短期 access token + 长期 refresh token。
 pub struct TokenPair {
     /// 访问令牌（JWT）
     pub access_token: String,
@@ -46,6 +59,7 @@ pub struct TokenPair {
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+/// 用户视图（对外输出的用户信息）。
 pub struct UserView {
     /// 用户 ID
     pub id: Uuid,
@@ -68,6 +82,7 @@ pub struct UserView {
 }
 
 #[derive(Debug, Clone, Serialize, ToSchema)]
+/// 注册结果：用户信息 + 令牌。
 pub struct AuthResult {
     /// 用户信息
     pub user: UserView,
@@ -75,6 +90,7 @@ pub struct AuthResult {
     pub tokens: TokenPair,
 }
 
+/// 注册新用户并签发一对令牌。
 pub async fn register(
     pool: &PgPool,
     jwt_cfg: &infra::JwtConfig,
@@ -188,6 +204,7 @@ pub async fn register(
     })
 }
 
+/// 校验用户凭证并签发一对令牌。
 pub async fn login(
     pool: &PgPool,
     jwt_cfg: &infra::JwtConfig,
@@ -273,6 +290,7 @@ pub async fn login(
     Ok(tokens)
 }
 
+/// 使用 refresh token 轮换并签发新的一对令牌。
 pub async fn refresh(
     pool: &PgPool,
     jwt_cfg: &infra::JwtConfig,
@@ -352,6 +370,7 @@ pub async fn refresh(
     })
 }
 
+/// 撤销该用户所有 refresh token，并递增 session_version 使 access token 立即失效。
 pub async fn logout(pool: &PgPool, input: LogoutInput) -> Result<(), gz_web::AppError> {
     if input.refresh_token.trim().is_empty() {
         return Ok(());
