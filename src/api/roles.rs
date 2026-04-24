@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 创建角色请求体。
 pub(crate) struct CreateRoleBody {
     /// 角色名称
     name: String,
@@ -32,6 +33,7 @@ pub(crate) struct CreateRoleBody {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 更新角色请求体（乐观锁保护）。
 pub(crate) struct UpdateRoleBody {
     /// 角色名称（可选）
     name: Option<String>,
@@ -42,18 +44,21 @@ pub(crate) struct UpdateRoleBody {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 替换角色权限请求体（全量覆盖）。
 pub(crate) struct ReplaceRolePermissionsBody {
     /// 权限 ID 列表
     permission_ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 替换用户角色请求体（全量覆盖）。
 pub(crate) struct ReplaceUserRolesBody {
     /// 角色 ID 列表
     role_ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+/// 角色视图（对外输出）。
 pub(crate) struct RoleView {
     /// 角色 ID
     id: Uuid,
@@ -65,6 +70,7 @@ pub(crate) struct RoleView {
     row_version: i64,
 }
 
+/// 查询角色列表（需要 roles.manage 权限）。
 #[utoipa::path(
     get,
     path = "/v1/roles",
@@ -90,6 +96,7 @@ pub(crate) async fn list_roles(
     ))
 }
 
+/// 创建角色（需要 roles.manage 权限）。
 #[utoipa::path(
     post,
     path = "/v1/roles",
@@ -138,6 +145,7 @@ pub(crate) async fn create_role(
     Ok(ApiResponse::ok(role_row_to_view(row)))
 }
 
+/// 查询角色详情（需要 roles.manage 权限）。
 #[utoipa::path(
     get,
     path = "/v1/roles/{id}",
@@ -168,6 +176,7 @@ pub(crate) async fn get_role(
     Ok(ApiResponse::ok(role_row_to_view(row)))
 }
 
+/// 更新角色（乐观锁 + 需要 roles.manage 权限）。
 #[utoipa::path(
     patch,
     path = "/v1/roles/{id}",
@@ -209,6 +218,7 @@ pub(crate) async fn update_role(
     Ok(ApiResponse::ok(role_row_to_view(updated)))
 }
 
+/// 删除角色（软删除；乐观锁 + 需要 roles.manage 权限）。
 #[utoipa::path(
     delete,
     path = "/v1/roles/{id}",
@@ -244,6 +254,7 @@ pub(crate) async fn delete_role(
     }
 }
 
+/// 替换角色拥有的权限列表（需要 roles.manage 权限）。
 #[utoipa::path(
     put,
     path = "/v1/roles/{id}/permissions",
@@ -294,6 +305,7 @@ pub(crate) async fn replace_role_permissions(
     Ok(ApiResponse::<()>::empty_ok())
 }
 
+/// 替换某个用户的角色列表（需要 roles.manage 权限）。
 #[utoipa::path(
     put,
     path = "/v1/users/{id}/roles",
@@ -339,6 +351,7 @@ pub(crate) async fn replace_user_roles(
     Ok(ApiResponse::<()>::empty_ok())
 }
 
+/// 将数据库 RoleRow 映射为对外输出的 RoleView。
 fn role_row_to_view(r: repo::roles::RoleRow) -> RoleView {
     RoleView {
         id: r.id,
@@ -348,6 +361,7 @@ fn role_row_to_view(r: repo::roles::RoleRow) -> RoleView {
     }
 }
 
+/// 将插入角色的常见数据库错误（如唯一约束冲突）映射为业务错误。
 fn map_insert_role_error(e: sqlx::Error) -> gz_web::AppError {
     match &e {
         sqlx::Error::Database(db) => {

@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::{error, infra, repo};
 
+/// 首个注册用户默认授予的管理员角色 ID（与 seed 数据一致）。
 const ADMIN_ROLE_ID: Uuid = Uuid::from_u128(1);
 
 #[derive(Debug, Clone)]
@@ -422,11 +423,13 @@ pub async fn logout(pool: &PgPool, input: LogoutInput) -> Result<(), gz_web::App
 }
 
 #[derive(Clone)]
+/// 生成 refresh token 时的返回结构：包含 raw token 与待入库记录。
 struct NewRefreshTokenWithRaw {
     raw_token: String,
     db: repo::refresh_tokens::NewRefreshToken,
 }
 
+/// 生成新的 refresh token（含随机串与入库字段）。
 fn new_refresh_token(
     cfg: &infra::JwtConfig,
     user_id: Uuid,
@@ -455,6 +458,7 @@ fn new_refresh_token(
     })
 }
 
+/// 在事务内签发 access token，并创建一条新的 refresh token 记录。
 async fn issue_tokens_in_tx(
     tx: &mut Transaction<'_, Postgres>,
     jwt_cfg: &infra::JwtConfig,
@@ -483,6 +487,7 @@ async fn issue_tokens_in_tx(
     })
 }
 
+/// 将数据库 UserRow 映射为对外输出的 UserView。
 fn user_view(user: repo::users::UserRow) -> UserView {
     UserView {
         id: user.id,
@@ -497,6 +502,7 @@ fn user_view(user: repo::users::UserRow) -> UserView {
     }
 }
 
+/// 将插入用户的常见数据库错误（如唯一约束冲突）映射为业务错误。
 fn map_insert_user_error(e: sqlx::Error) -> gz_web::AppError {
     match &e {
         sqlx::Error::Database(db) => {
@@ -516,6 +522,7 @@ fn map_insert_user_error(e: sqlx::Error) -> gz_web::AppError {
     }
 }
 
+/// 计算字符串的 SHA-256 hex（用于 refresh token 哈希化存储）。
 fn sha256_hex(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());

@@ -15,8 +15,10 @@ pub struct AuthUser {
 }
 
 impl FromRequestParts<AppState> for AuthUser {
+    /// 认证失败时返回的统一错误类型。
     type Rejection = gz_web::AppError;
 
+    /// 从请求头解析 Bearer token，校验 JWT，并按 session_version 做服务端撤销检查。
     async fn from_request_parts(
         parts: &mut Parts,
         state: &AppState,

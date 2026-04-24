@@ -21,6 +21,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Deserialize)]
+/// 查询用户列表的过滤与分页参数。
 pub(crate) struct UsersQuery {
     email: Option<String>,
     phone: Option<String>,
@@ -31,6 +32,7 @@ pub(crate) struct UsersQuery {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+/// 用户列表响应体（游标分页）。
 pub(crate) struct UsersListView {
     /// 用户列表
     items: Vec<service::auth::UserView>,
@@ -41,6 +43,7 @@ pub(crate) struct UsersListView {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 创建用户请求体。
 pub(crate) struct CreateUserBody {
     /// 邮箱（可选，邮箱或手机号至少提供一个）
     email: Option<String>,
@@ -57,6 +60,7 @@ pub(crate) struct CreateUserBody {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 更新用户请求体（乐观锁保护）。
 pub(crate) struct UpdateUserBody {
     /// 显示名称（可选）
     display_name: Option<String>,
@@ -69,11 +73,13 @@ pub(crate) struct UpdateUserBody {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 删除用户请求体（软删除，乐观锁保护）。
 pub(crate) struct DeleteUserBody {
     /// 乐观锁版本号（row_version）
     row_version: i64,
 }
 
+/// 查询用户列表（带 RBAC 权限校验）。
 #[utoipa::path(
     get,
     path = "/v1/users",
@@ -124,6 +130,7 @@ pub(crate) async fn list_users(
     }))
 }
 
+/// 创建用户（由具备 users.write 权限的操作者执行）。
 #[utoipa::path(
     post,
     path = "/v1/users",
@@ -202,6 +209,7 @@ pub(crate) async fn create_user(
     Ok(ApiResponse::ok(user_row_to_view(row)))
 }
 
+/// 查询用户详情（带 RBAC 权限校验）。
 #[utoipa::path(
     get,
     path = "/v1/users/{id}",
@@ -232,6 +240,7 @@ pub(crate) async fn get_user(
     Ok(ApiResponse::ok(user_row_to_view(row)))
 }
 
+/// 更新用户信息（乐观锁 + RBAC）。
 #[utoipa::path(
     patch,
     path = "/v1/users/{id}",
@@ -274,6 +283,7 @@ pub(crate) async fn update_user(
     Ok(ApiResponse::ok(user_row_to_view(updated)))
 }
 
+/// 删除用户（软删除，命令式 POST；乐观锁 + RBAC）。
 #[utoipa::path(
     post,
     path = "/v1/users/{id}/delete",
@@ -309,6 +319,7 @@ pub(crate) async fn delete_user(
     }
 }
 
+/// 将数据库 UserRow 映射为对外输出的 UserView。
 fn user_row_to_view(u: repo::users::UserRow) -> service::auth::UserView {
     service::auth::UserView {
         id: u.id,
@@ -323,6 +334,7 @@ fn user_row_to_view(u: repo::users::UserRow) -> service::auth::UserView {
     }
 }
 
+/// 将插入用户的常见数据库错误（如唯一约束冲突）映射为业务错误。
 fn map_insert_user_error(e: sqlx::Error) -> gz_web::AppError {
     match &e {
         sqlx::Error::Database(db) => {

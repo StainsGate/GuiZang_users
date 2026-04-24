@@ -24,6 +24,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Deserialize, Serialize, ToSchema)]
+/// 注册请求体。
 pub(crate) struct RegisterBody {
     /// 邮箱（可选，邮箱或手机号至少提供一个）
     email: Option<String>,
@@ -36,6 +37,7 @@ pub(crate) struct RegisterBody {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 登录请求体。
 pub(crate) struct LoginBody {
     /// 登录标识（邮箱或手机号）
     identifier: String,
@@ -44,18 +46,21 @@ pub(crate) struct LoginBody {
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 刷新令牌请求体。
 pub(crate) struct RefreshBody {
     /// 刷新令牌
     refresh_token: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
+/// 登出请求体。
 pub(crate) struct LogoutBody {
     /// 刷新令牌
     refresh_token: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+/// 当前用户信息响应体（用户信息 + RBAC 信息）。
 pub(crate) struct MeView {
     /// 用户信息
     user: service::auth::UserView,
@@ -65,6 +70,7 @@ pub(crate) struct MeView {
     permissions: Vec<String>,
 }
 
+/// 注册新用户（支持 Idempotency-Key）。
 #[utoipa::path(
     post,
     path = "/v1/auth/register",
@@ -81,16 +87,13 @@ pub(crate) async fn register(
     let pool = infra::must_pool(&state).await?;
     let jwt_cfg = infra::must_jwt_config(&state).await?;
 
-    let request_bytes =
-        serde_json::to_vec(&req).map_err(|_| error::bad_request("invalid register body"))?;
-
     let idempotency_key = headers
         .get("Idempotency-Key")
         .and_then(|v| v.to_str().ok())
         .map(|v| v.trim().to_string())
         .filter(|v| !v.is_empty());
 
-    let request_hash = sha256_hex_bytes(&request_bytes);
+    let request_hash = sha256_hex_register_body(&req);
 
     if let Some(key) = &idempotency_key {
         if let Some(r) = repo::idempotency::get_valid(&pool, "auth.register", key)
@@ -151,6 +154,7 @@ pub(crate) async fn register(
     Ok(payload.into_response())
 }
 
+/// 校验用户凭证并签发一对令牌。
 #[utoipa::path(
     post,
     path = "/v1/auth/login",
@@ -182,6 +186,7 @@ pub(crate) async fn login(
     Ok(ApiResponse::ok(tokens))
 }
 
+/// 使用 refresh token 轮换并签发新的令牌对。
 #[utoipa::path(
     post,
     path = "/v1/auth/refresh",
@@ -212,6 +217,7 @@ pub(crate) async fn refresh(
     Ok(ApiResponse::ok(tokens))
 }
 
+/// 登出：撤销 refresh token，并使已有 access token 失效。
 #[utoipa::path(
     post,
     path = "/v1/auth/logout",
@@ -235,6 +241,7 @@ pub(crate) async fn logout(
     Ok(ApiResponse::<()>::empty_ok())
 }
 
+/// 获取当前用户信息与 RBAC 信息。
 #[utoipa::path(
     get,
     path = "/v1/auth/me",
@@ -292,6 +299,7 @@ pub(crate) async fn me(
     }))
 }
 
+/// 从请求头读取 User-Agent（用于 refresh token 记录审计字段）。
 fn user_agent(headers: &HeaderMap) -> Option<String> {
     headers
         .get("User-Agent")
@@ -299,10 +307,28 @@ fn user_agent(headers: &HeaderMap) -> Option<String> {
         .map(|v| v.to_string())
 }
 
-fn sha256_hex_bytes(input: &[u8]) -> String {
+/// 计算 register 请求体的幂等性哈希（避免对请求体做二次 JSON 序列化）。
+fn sha256_hex_register_body(req: &RegisterBody) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
-    hasher.update(input);
-    let out = hasher.finalize();
-    hex::encode(out)
+
+    hasher.update(b"email:");
+    match req.email.as_deref() {
+        Some(v) => hasher.update(v.trim().as_bytes()),
+        None => hasher.update(b"<none>"),
+    }
+
+    hasher.update(b";phone:");
+    match req.phone.as_deref() {
+        Some(v) => hasher.update(v.trim().as_bytes()),
+        None => hasher.update(b"<none>"),
+    }
+
+    hasher.update(b";password:");
+    hasher.update(req.password.as_bytes());
+
+    hasher.update(b";display_name:");
+    hasher.update(req.display_name.trim().as_bytes());
+
+    hex::encode(hasher.finalize())
 }

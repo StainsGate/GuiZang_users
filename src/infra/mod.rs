@@ -79,6 +79,7 @@ pub async fn must_jwt_config(state: &AppState) -> Result<Arc<JwtConfig>, AppErro
         .ok_or_else(|| AppError::internal("missing JwtConfig in AppState"))
 }
 
+/// 从 config.extra.jwt_secret 读取 JWT 密钥字符串。
 fn read_secret(cfg: &AppConfig) -> Option<String> {
     cfg.extra.get("jwt_secret").and_then(|v| match v {
         Value::String(s) => Some(s.clone()),

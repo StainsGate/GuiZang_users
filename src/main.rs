@@ -11,12 +11,18 @@ use gz_web::{middleware, swagger::SwaggerRouterExt, ApiResponse, RouterAppStateE
 use serde::Deserialize;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 
+/// HTTP API 入口与 OpenAPI 文档。
 mod api;
+/// 统一的错误构造与上下文包装。
 mod error;
+/// 基础设施能力（JWT、密码哈希、PgPool 注入等）。
 mod infra;
+/// 数据访问层（SQLx）。
 mod repo;
+/// 业务服务层（认证与 RBAC）。
 mod service;
 
+/// 健康检查处理器。
 async fn health(State(state): State<AppState>) -> impl IntoResponse {
     tracing::info!(trace_id = gz_observe::current_trace_id(), "health");
     ApiResponse::ok(format!("ok (addr={})", state.config.server.addr))
@@ -24,9 +30,11 @@ async fn health(State(state): State<AppState>) -> impl IntoResponse {
 
 #[derive(Debug, thiserror::Error)]
 #[error("missing env: {0}")]
+/// 服务启动所需环境变量缺失。
 struct MissingEnv(&'static str);
 
 #[tokio::main]
+/// 二进制入口：加载配置、初始化观测与依赖注入，并启动 HTTP 服务。
 async fn main() -> Result<(), CoreError> {
     let (cfg, env) = AppConfig::load()?;
     ensure_app_env(&env);
@@ -80,12 +88,14 @@ async fn main() -> Result<(), CoreError> {
 }
 
 #[derive(Debug, Deserialize)]
+/// 从 config.extra.otel 解析的 OTEL 相关配置。
 struct OtelConfig {
     enabled: Option<bool>,
     exporter_otlp_endpoint: Option<String>,
     service_name: Option<String>,
 }
 
+/// 确保 `APP_ENV` 存在：未显式设置时回填为 gz_core::Environment。
 fn ensure_app_env(env: &gz_core::Environment) {
     if std::env::var("APP_ENV")
         .ok()
@@ -98,6 +108,7 @@ fn ensure_app_env(env: &gz_core::Environment) {
     std::env::set_var("APP_ENV", env.as_str());
 }
 
+/// 从配置文件派生 OTEL 环境变量（不覆盖已存在的显式环境变量）。
 fn apply_otel_env_from_config(cfg: &AppConfig) {
     let otel = cfg
         .extra
@@ -142,6 +153,7 @@ fn apply_otel_env_from_config(cfg: &AppConfig) {
     }
 }
 
+/// 判断是否启用 OTEL：OTLP endpoint 或 APP_OTEL_ENABLED 任一开启即视为启用。
 fn otel_enabled() -> bool {
     std::env::var("OTEL_EXPORTER_OTLP_ENDPOINT")
         .ok()

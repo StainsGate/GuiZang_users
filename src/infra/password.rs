@@ -12,6 +12,7 @@ pub struct PasswordError {
 }
 
 impl std::fmt::Display for PasswordError {
+    /// 输出可读错误信息（不包含敏感数据）。
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(&self.message)
     }
@@ -42,10 +43,12 @@ pub fn verify_password(plain: &str, password_hash: &str) -> Result<bool, Passwor
 }
 
 #[cfg(test)]
+/// 密码哈希/校验的自检用例。
 mod tests {
     use super::*;
 
     #[test]
+    /// 基本 roundtrip：hash 后可验证，错误密码验证失败。
     fn password_roundtrip() {
         let hash = hash_password("p@ssw0rd").unwrap();
         assert!(verify_password("p@ssw0rd", &hash).unwrap());

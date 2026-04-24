@@ -13,6 +13,7 @@ pub fn router() -> Router<AppState> {
 }
 
 #[derive(Debug, Serialize, ToSchema)]
+/// 权限视图（对外输出）。
 pub(crate) struct PermissionView {
     /// 权限 ID
     id: Uuid,
@@ -24,6 +25,7 @@ pub(crate) struct PermissionView {
     row_version: i64,
 }
 
+/// 查询权限列表（需要 permissions.read 权限）。
 #[utoipa::path(
     get,
     path = "/v1/permissions",

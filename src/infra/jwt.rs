@@ -63,11 +63,13 @@ pub fn verify_access_token(
 }
 
 #[cfg(test)]
+/// JWT 签发与校验的自检用例。
 mod tests {
     use super::*;
     use std::sync::Arc;
 
     #[test]
+    /// 基本 roundtrip：签发后可解析出相同 user_id 与 session_version。
     fn jwt_roundtrip() {
         let cfg = JwtConfig {
             secret: Arc::from(b"test-secret".to_vec()),

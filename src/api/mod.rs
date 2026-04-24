@@ -4,10 +4,15 @@ use gz_web::ApiResponse;
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{openapi, Modify, OpenApi};
 
+/// 认证与会话相关接口。
 mod auth;
+/// 请求提取器（如 AuthUser）。
 mod extractors;
+/// 权限查询接口。
 mod permissions;
+/// 角色管理接口。
 mod roles;
+/// 用户管理接口。
 mod users;
 
 #[derive(OpenApi)]
@@ -52,9 +57,11 @@ mod users;
 ))]
 pub struct ApiDoc;
 
+/// 为 OpenAPI 文档注入安全方案（Swagger UI 的 Authorize 按钮依赖此定义）。
 struct ApiDocSecurity;
 
 impl Modify for ApiDocSecurity {
+    /// 向 OpenAPI components 写入 bearerAuth 安全方案。
     fn modify(&self, openapi: &mut openapi::OpenApi) {
         let components = openapi.components.get_or_insert_with(Default::default);
         components.add_security_scheme(
@@ -69,6 +76,7 @@ impl Modify for ApiDocSecurity {
     }
 }
 
+/// API 聚合路由：合并各子模块 Router，并包含系统接口。
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ping", get(ping))
@@ -87,6 +95,7 @@ pub fn router() -> Router<AppState> {
         (status = 200, description = "连通性检查（pong）")
     )
 )]
+/// 简单连通性检查接口。
 async fn ping() -> ApiResponse<&'static str> {
     ApiResponse::ok("pong")
 }
