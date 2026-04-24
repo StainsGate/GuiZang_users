@@ -79,6 +79,13 @@ pub(crate) struct MeView {
     security(()),
     responses((status = 200, description = "注册成功"))
 )]
+#[tracing::instrument(
+    level = "info",
+    name = "api.auth.register",
+    skip(state, headers, req),
+    fields(op = "auth.register", idempotency_key_present = tracing::field::Empty),
+    err
+)]
 pub(crate) async fn register(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -96,6 +103,7 @@ pub(crate) async fn register(
     let request_hash = sha256_hex_register_body(&req);
 
     if let Some(key) = &idempotency_key {
+        tracing::Span::current().record("idempotency_key_present", &tracing::field::display(true));
         if let Some(r) = repo::idempotency::get_valid(&pool, "auth.register", key)
             .await
             .map_err(|e| {
@@ -128,11 +136,23 @@ pub(crate) async fn register(
     )
     .await?;
 
+    tracing::info!(
+        op = "auth.register",
+        trace_id = gz_observe::current_trace_id(),
+        user_id = %result.user.id,
+        status_code = 200,
+        "api response"
+    );
+
     let payload = ApiResponse::ok(result);
     if let Some(key) = idempotency_key {
         let expires_at = Utc::now() + Duration::hours(24);
-        let response_body =
-            serde_json::to_value(&payload).map_err(|_| error::internal("serialize error"))?;
+        let response_body = serde_json::to_value(&payload).map_err(|e| {
+            error::with_context(
+                error::internal("serialize error"),
+                serde_json::json!({ "op": "serialize_register_response", "err": e.to_string() }),
+            )
+        })?;
         repo::idempotency::insert(
             &pool,
             "auth.register",
@@ -163,6 +183,13 @@ pub(crate) async fn register(
     security(()),
     responses((status = 200, description = "登录成功"))
 )]
+#[tracing::instrument(
+    level = "info",
+    name = "api.auth.login",
+    skip(state, headers, req),
+    fields(op = "auth.login"),
+    err
+)]
 pub(crate) async fn login(
     State(state): State<AppState>,
     headers: HeaderMap,
@@ -183,6 +210,12 @@ pub(crate) async fn login(
     )
     .await?;
 
+    tracing::info!(
+        op = "auth.login",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        "api response"
+    );
     Ok(ApiResponse::ok(tokens))
 }
 
@@ -194,6 +227,13 @@ pub(crate) async fn login(
     request_body = RefreshBody,
     security(()),
     responses((status = 200, description = "刷新令牌成功"))
+)]
+#[tracing::instrument(
+    level = "info",
+    name = "api.auth.refresh",
+    skip(state, headers, req),
+    fields(op = "auth.refresh"),
+    err
 )]
 pub(crate) async fn refresh(
     State(state): State<AppState>,
@@ -214,6 +254,12 @@ pub(crate) async fn refresh(
     )
     .await?;
 
+    tracing::info!(
+        op = "auth.refresh",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        "api response"
+    );
     Ok(ApiResponse::ok(tokens))
 }
 
@@ -225,6 +271,13 @@ pub(crate) async fn refresh(
     request_body = LogoutBody,
     security(()),
     responses((status = 200, description = "登出成功"))
+)]
+#[tracing::instrument(
+    level = "info",
+    name = "api.auth.logout",
+    skip(state, req),
+    fields(op = "auth.logout"),
+    err
 )]
 pub(crate) async fn logout(
     State(state): State<AppState>,
@@ -238,6 +291,12 @@ pub(crate) async fn logout(
         },
     )
     .await?;
+    tracing::info!(
+        op = "auth.logout",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        "api response"
+    );
     Ok(ApiResponse::<()>::empty_ok())
 }
 
@@ -248,6 +307,7 @@ pub(crate) async fn logout(
     tag = "Auth",
     responses((status = 200, description = "获取当前用户信息"))
 )]
+#[tracing::instrument(level = "info", name = "api.auth.me", skip(state), fields(op = "auth.me", user_id = %user.user_id), err)]
 pub(crate) async fn me(
     State(state): State<AppState>,
     user: AuthUser,
@@ -281,6 +341,15 @@ pub(crate) async fn me(
                 serde_json::json!({ "op": "list_user_permissions", "err": e.to_string() }),
             )
         })?;
+
+    tracing::info!(
+        op = "auth.me",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        roles_len = roles.len(),
+        permissions_len = permissions.len(),
+        "api response"
+    );
 
     Ok(ApiResponse::ok(MeView {
         user: service::auth::UserView {

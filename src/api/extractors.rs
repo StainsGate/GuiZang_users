@@ -19,6 +19,12 @@ impl FromRequestParts<AppState> for AuthUser {
     type Rejection = gz_web::AppError;
 
     /// 从请求头解析 Bearer token，校验 JWT，并按 session_version 做服务端撤销检查。
+    #[tracing::instrument(
+        level = "debug",
+        name = "auth.extract_user",
+        skip(parts, state),
+        fields(op = "auth.extract_user", user_id = tracing::field::Empty)
+    )]
     async fn from_request_parts(
         parts: &mut Parts,
         state: &AppState,
@@ -37,6 +43,7 @@ impl FromRequestParts<AppState> for AuthUser {
         let cfg = infra::must_jwt_config(state).await?;
         let (user_id, token_session_version) = infra::jwt::verify_access_token(token, cfg.as_ref())
             .map_err(|_| error::unauthorized("invalid token"))?;
+        tracing::Span::current().record("user_id", &tracing::field::display(user_id));
 
         let pool = infra::must_pool(state).await?;
         let current = repo::users::get_session_version(&pool, user_id)

@@ -92,6 +92,13 @@ pub struct AuthResult {
 }
 
 /// 注册新用户并签发一对令牌。
+#[tracing::instrument(
+    level = "info",
+    name = "service.auth.register",
+    skip(pool, jwt_cfg, input, ip, user_agent),
+    fields(op = "auth.register", user_id = tracing::field::Empty, is_first_user = tracing::field::Empty)
+    , err
+)]
 pub async fn register(
     pool: &PgPool,
     jwt_cfg: &infra::JwtConfig,
@@ -118,8 +125,12 @@ pub async fn register(
         return Err(error::bad_request("display_name is required"));
     }
 
-    let password_hash = infra::password::hash_password(&input.password)
-        .map_err(|_| error::internal("password hash error"))?;
+    let password_hash = infra::password::hash_password(&input.password).map_err(|e| {
+        error::with_context(
+            error::internal("password hash error"),
+            serde_json::json!({ "op": "hash_password", "err": e.to_string() }),
+        )
+    })?;
 
     let mut tx: Transaction<'_, Postgres> = pool.begin().await.map_err(|e| {
         error::with_context(
@@ -144,8 +155,10 @@ pub async fn register(
         )
     })?;
     let is_first_user = existing_users == 0;
+    tracing::Span::current().record("is_first_user", &tracing::field::display(is_first_user));
 
     let user_id = Uuid::new_v4();
+    tracing::Span::current().record("user_id", &tracing::field::display(user_id));
 
     let user = repo::users::insert(
         &mut *tx,
@@ -206,6 +219,13 @@ pub async fn register(
 }
 
 /// 校验用户凭证并签发一对令牌。
+#[tracing::instrument(
+    level = "info",
+    name = "service.auth.login",
+    skip(pool, jwt_cfg, input, ip, user_agent),
+    fields(op = "auth.login", user_id = tracing::field::Empty, identifier_kind = tracing::field::Empty)
+    , err
+)]
 pub async fn login(
     pool: &PgPool,
     jwt_cfg: &infra::JwtConfig,
@@ -218,6 +238,12 @@ pub async fn login(
     }
 
     let identifier = input.identifier.trim();
+    let identifier_kind = if identifier.contains('@') {
+        "email"
+    } else {
+        "phone"
+    };
+    tracing::Span::current().record("identifier_kind", &tracing::field::display(identifier_kind));
     let (email_normalized, phone) = if identifier.contains('@') {
         (Some(identifier.to_ascii_lowercase()), None)
     } else {
@@ -234,6 +260,7 @@ pub async fn login(
                 )
             })?
             .ok_or_else(|| error::unauthorized("invalid credentials"))?;
+    tracing::Span::current().record("user_id", &tracing::field::display(user.id));
 
     let cred = repo::credentials::get_by_user_id(pool, user.id)
         .await
@@ -251,18 +278,28 @@ pub async fn login(
         }
     }
 
-    let ok = infra::password::verify_password(&input.password, &cred.password_hash)
-        .map_err(|_| error::internal("password verify error"))?;
+    let ok = infra::password::verify_password(&input.password, &cred.password_hash).map_err(|e| {
+        error::with_context(
+            error::internal("password verify error"),
+            serde_json::json!({ "op": "verify_password", "user_id": user.id, "err": e.to_string() }),
+        )
+    })?;
 
     if !ok {
-        let _ = repo::credentials::on_login_failed(pool, user.id, 5, Duration::minutes(15)).await;
+        if let Err(e) =
+            repo::credentials::on_login_failed(pool, user.id, 5, Duration::minutes(15)).await
+        {
+            tracing::warn!(op = "on_login_failed", user_id = %user.id, err = %e, "db operation failed");
+        }
         return Err(error::unauthorized("invalid credentials"));
     }
 
-    repo::credentials::on_login_succeeded(pool, user.id)
-        .await
-        .ok();
-    repo::users::touch_last_login(pool, user.id).await.ok();
+    if let Err(e) = repo::credentials::on_login_succeeded(pool, user.id).await {
+        tracing::warn!(op = "on_login_succeeded", user_id = %user.id, err = %e, "db operation failed");
+    }
+    if let Err(e) = repo::users::touch_last_login(pool, user.id).await {
+        tracing::warn!(op = "touch_last_login", user_id = %user.id, err = %e, "db operation failed");
+    }
 
     let mut tx: Transaction<'_, Postgres> = pool.begin().await.map_err(|e| {
         error::with_context(
@@ -292,6 +329,13 @@ pub async fn login(
 }
 
 /// 使用 refresh token 轮换并签发新的一对令牌。
+#[tracing::instrument(
+    level = "info",
+    name = "service.auth.refresh",
+    skip(pool, jwt_cfg, input, ip, user_agent),
+    fields(op = "auth.refresh", user_id = tracing::field::Empty)
+    , err
+)]
 pub async fn refresh(
     pool: &PgPool,
     jwt_cfg: &infra::JwtConfig,
@@ -313,6 +357,7 @@ pub async fn refresh(
             )
         })?
         .ok_or_else(|| error::unauthorized("invalid refresh token"))?;
+    tracing::Span::current().record("user_id", &tracing::field::display(existing.user_id));
 
     if existing.revoked_at.is_some() || existing.expires_at <= Utc::now() {
         return Err(error::unauthorized("invalid refresh token"));
@@ -361,8 +406,13 @@ pub async fn refresh(
         })?
         .ok_or_else(|| error::unauthorized("invalid refresh token"))?;
 
-    let access_token = infra::jwt::sign_access_token(existing.user_id, session_version, jwt_cfg)
-        .map_err(|_| error::internal("jwt sign error"))?;
+    let access_token =
+        infra::jwt::sign_access_token(existing.user_id, session_version, jwt_cfg).map_err(|e| {
+            error::with_context(
+                error::internal("jwt sign error"),
+                serde_json::json!({ "op": "sign_access_token", "user_id": existing.user_id, "err": e.to_string() }),
+            )
+        })?;
 
     Ok(TokenPair {
         access_token,
@@ -372,6 +422,7 @@ pub async fn refresh(
 }
 
 /// 撤销该用户所有 refresh token，并递增 session_version 使 access token 立即失效。
+#[tracing::instrument(level = "info", name = "service.auth.logout", skip(pool, input), fields(op = "auth.logout", user_id = tracing::field::Empty), err)]
 pub async fn logout(pool: &PgPool, input: LogoutInput) -> Result<(), gz_web::AppError> {
     if input.refresh_token.trim().is_empty() {
         return Ok(());
@@ -387,6 +438,7 @@ pub async fn logout(pool: &PgPool, input: LogoutInput) -> Result<(), gz_web::App
             )
         })?
     {
+        tracing::Span::current().record("user_id", &tracing::field::display(r.user_id));
         let mut tx: Transaction<'_, Postgres> = pool.begin().await.map_err(|e| {
             error::with_context(
                 error::internal("db error"),
@@ -467,8 +519,13 @@ async fn issue_tokens_in_tx(
     ip: Option<String>,
     user_agent: Option<String>,
 ) -> Result<TokenPair, gz_web::AppError> {
-    let access_token = infra::jwt::sign_access_token(user_id, session_version, jwt_cfg)
-        .map_err(|_| error::internal("jwt sign error"))?;
+    let access_token =
+        infra::jwt::sign_access_token(user_id, session_version, jwt_cfg).map_err(|e| {
+            error::with_context(
+                error::internal("jwt sign error"),
+                serde_json::json!({ "op": "sign_access_token", "user_id": user_id, "err": e.to_string() }),
+            )
+        })?;
 
     let new = new_refresh_token(jwt_cfg, user_id, ip, user_agent)?;
     repo::refresh_tokens::insert(&mut **tx, new.db)
@@ -512,12 +569,12 @@ fn map_insert_user_error(e: sqlx::Error) -> gz_web::AppError {
             }
             error::with_context(
                 error::internal("db error"),
-                serde_json::json!({ "err": e.to_string() }),
+                serde_json::json!({ "op": "insert_user", "db_code": code, "err": e.to_string() }),
             )
         }
         _ => error::with_context(
             error::internal("db error"),
-            serde_json::json!({ "err": e.to_string() }),
+            serde_json::json!({ "op": "insert_user", "err": e.to_string() }),
         ),
     }
 }

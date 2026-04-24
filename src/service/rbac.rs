@@ -4,6 +4,7 @@ use uuid::Uuid;
 use crate::{error, repo};
 
 /// 要求指定用户具备某个权限码，否则返回 403。
+#[tracing::instrument(level = "info", name = "service.rbac.require_permission", skip(pool), fields(op = "rbac.require_permission", user_id = %user_id, permission_code = permission_code))]
 pub async fn require_permission(
     pool: &PgPool,
     user_id: Uuid,
@@ -14,7 +15,7 @@ pub async fn require_permission(
         .map_err(|e| {
             error::with_context(
                 error::internal("db error"),
-                serde_json::json!({ "op": "has_permission", "err": e.to_string() }),
+                serde_json::json!({ "op": "has_permission", "user_id": user_id, "permission_code": permission_code, "err": e.to_string() }),
             )
         })?;
 

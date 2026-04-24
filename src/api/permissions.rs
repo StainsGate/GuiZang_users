@@ -32,6 +32,7 @@ pub(crate) struct PermissionView {
     tag = "Permissions",
     responses((status = 200, description = "查询权限列表"))
 )]
+#[tracing::instrument(level = "info", name = "api.permissions.list", skip(state, user), fields(op = "permissions.list", actor_user_id = %user.user_id), err)]
 pub(crate) async fn list_permissions(
     State(state): State<AppState>,
     user: AuthUser,
@@ -46,6 +47,13 @@ pub(crate) async fn list_permissions(
         )
     })?;
 
+    tracing::info!(
+        op = "permissions.list",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        items_len = rows.len(),
+        "api response"
+    );
     Ok(ApiResponse::ok(
         rows.into_iter()
             .map(|p| PermissionView {

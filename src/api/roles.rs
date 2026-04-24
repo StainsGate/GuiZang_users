@@ -77,6 +77,7 @@ pub(crate) struct RoleView {
     tag = "Roles",
     responses((status = 200, description = "查询角色列表"))
 )]
+#[tracing::instrument(level = "info", name = "api.roles.list", skip(state, user), fields(op = "roles.list", actor_user_id = %user.user_id), err)]
 pub(crate) async fn list_roles(
     State(state): State<AppState>,
     user: AuthUser,
@@ -91,6 +92,13 @@ pub(crate) async fn list_roles(
         )
     })?;
 
+    tracing::info!(
+        op = "roles.list",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        items_len = rows.len(),
+        "api response"
+    );
     Ok(ApiResponse::ok(
         rows.into_iter().map(role_row_to_view).collect(),
     ))
@@ -104,6 +112,7 @@ pub(crate) async fn list_roles(
     request_body = CreateRoleBody,
     responses((status = 200, description = "创建角色"))
 )]
+#[tracing::instrument(level = "info", name = "api.roles.create", skip(state, user, req), fields(op = "roles.create", actor_user_id = %user.user_id), err)]
 pub(crate) async fn create_role(
     State(state): State<AppState>,
     user: AuthUser,
@@ -142,6 +151,14 @@ pub(crate) async fn create_role(
         )
     })?;
 
+    tracing::info!(
+        op = "roles.create",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        role_id = %row.id,
+        row_version = row.row_version,
+        "api response"
+    );
     Ok(ApiResponse::ok(role_row_to_view(row)))
 }
 
@@ -155,6 +172,7 @@ pub(crate) async fn create_role(
     tag = "Roles",
     responses((status = 200, description = "查询角色详情"))
 )]
+#[tracing::instrument(level = "info", name = "api.roles.get", skip(state, user), fields(op = "roles.get", actor_user_id = %user.user_id, role_id = %id), err)]
 pub(crate) async fn get_role(
     State(state): State<AppState>,
     user: AuthUser,
@@ -173,6 +191,14 @@ pub(crate) async fn get_role(
         })?
         .ok_or_else(|| error::not_found("role not found"))?;
 
+    tracing::info!(
+        op = "roles.get",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        role_id = %row.id,
+        row_version = row.row_version,
+        "api response"
+    );
     Ok(ApiResponse::ok(role_row_to_view(row)))
 }
 
@@ -187,6 +213,7 @@ pub(crate) async fn get_role(
     request_body = UpdateRoleBody,
     responses((status = 200, description = "更新角色"))
 )]
+#[tracing::instrument(level = "info", name = "api.roles.update", skip(state, user, req), fields(op = "roles.update", actor_user_id = %user.user_id, role_id = %id), err)]
 pub(crate) async fn update_role(
     State(state): State<AppState>,
     user: AuthUser,
@@ -215,6 +242,14 @@ pub(crate) async fn update_role(
     })?
     .ok_or_else(|| error::conflict("row_version mismatch or role not found"))?;
 
+    tracing::info!(
+        op = "roles.update",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        role_id = %updated.id,
+        row_version = updated.row_version,
+        "api response"
+    );
     Ok(ApiResponse::ok(role_row_to_view(updated)))
 }
 
@@ -229,6 +264,7 @@ pub(crate) async fn update_role(
     request_body = UpdateRoleBody,
     responses((status = 200, description = "删除角色（软删除）"))
 )]
+#[tracing::instrument(level = "info", name = "api.roles.delete", skip(state, user, req), fields(op = "roles.delete", actor_user_id = %user.user_id, role_id = %id), err)]
 pub(crate) async fn delete_role(
     State(state): State<AppState>,
     user: AuthUser,
@@ -248,6 +284,13 @@ pub(crate) async fn delete_role(
         })?;
 
     if ok {
+        tracing::info!(
+            op = "roles.delete",
+            trace_id = gz_observe::current_trace_id(),
+            status_code = 200,
+            role_id = %id,
+            "api response"
+        );
         Ok(ApiResponse::<()>::empty_ok())
     } else {
         Err(error::conflict("row_version mismatch or role not found"))
@@ -265,6 +308,7 @@ pub(crate) async fn delete_role(
     request_body = ReplaceRolePermissionsBody,
     responses((status = 200, description = "替换角色权限"))
 )]
+#[tracing::instrument(level = "info", name = "api.roles.replace_permissions", skip(state, user, req), fields(op = "roles.replace_permissions", actor_user_id = %user.user_id, role_id = %role_id), err)]
 pub(crate) async fn replace_role_permissions(
     State(state): State<AppState>,
     user: AuthUser,
@@ -302,6 +346,14 @@ pub(crate) async fn replace_role_permissions(
         )
     })?;
 
+    tracing::info!(
+        op = "roles.replace_permissions",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        role_id = %role_id,
+        permission_ids_len = req.permission_ids.len(),
+        "api response"
+    );
     Ok(ApiResponse::<()>::empty_ok())
 }
 
@@ -316,6 +368,7 @@ pub(crate) async fn replace_role_permissions(
     request_body = ReplaceUserRolesBody,
     responses((status = 200, description = "替换用户角色"))
 )]
+#[tracing::instrument(level = "info", name = "api.users.replace_roles", skip(state, user, req), fields(op = "users.replace_roles", actor_user_id = %user.user_id, target_user_id = %target_user_id), err)]
 pub(crate) async fn replace_user_roles(
     State(state): State<AppState>,
     user: AuthUser,
@@ -348,6 +401,14 @@ pub(crate) async fn replace_user_roles(
         )
     })?;
 
+    tracing::info!(
+        op = "users.replace_roles",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        target_user_id = %target_user_id,
+        role_ids_len = req.role_ids.len(),
+        "api response"
+    );
     Ok(ApiResponse::<()>::empty_ok())
 }
 
@@ -371,12 +432,12 @@ fn map_insert_role_error(e: sqlx::Error) -> gz_web::AppError {
             }
             error::with_context(
                 error::internal("db error"),
-                serde_json::json!({ "err": e.to_string() }),
+                serde_json::json!({ "op": "insert_role", "db_code": code, "err": e.to_string() }),
             )
         }
         _ => error::with_context(
             error::internal("db error"),
-            serde_json::json!({ "err": e.to_string() }),
+            serde_json::json!({ "op": "insert_role", "err": e.to_string() }),
         ),
     }
 }

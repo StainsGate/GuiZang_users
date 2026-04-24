@@ -23,6 +23,12 @@ mod repo;
 mod service;
 
 /// 健康检查处理器。
+#[tracing::instrument(
+    level = "info",
+    name = "api.system.health",
+    skip(state),
+    fields(op = "system.health")
+)]
 async fn health(State(state): State<AppState>) -> impl IntoResponse {
     tracing::info!(trace_id = gz_observe::current_trace_id(), "health");
     ApiResponse::ok(format!("ok (addr={})", state.config.server.addr))

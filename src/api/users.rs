@@ -86,6 +86,7 @@ pub(crate) struct DeleteUserBody {
     tag = "Users",
     responses((status = 200, description = "查询用户列表"))
 )]
+#[tracing::instrument(level = "info", name = "api.users.list", skip(state, user, q), fields(op = "users.list", actor_user_id = %user.user_id), err)]
 pub(crate) async fn list_users(
     State(state): State<AppState>,
     user: AuthUser,
@@ -121,6 +122,18 @@ pub(crate) async fn list_users(
         )
     })?;
 
+    tracing::info!(
+        op = "users.list",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        limit = limit,
+        filter_email = q.email.is_some(),
+        filter_phone = q.phone.is_some(),
+        filter_status = q.status.is_some(),
+        items_len = rows.len(),
+        "api response"
+    );
+
     let next = rows.last().map(|u| (u.created_at, u.id));
 
     Ok(ApiResponse::ok(UsersListView {
@@ -138,6 +151,7 @@ pub(crate) async fn list_users(
     request_body = CreateUserBody,
     responses((status = 200, description = "创建用户"))
 )]
+#[tracing::instrument(level = "info", name = "api.users.create", skip(state, user, req), fields(op = "users.create", actor_user_id = %user.user_id), err)]
 pub(crate) async fn create_user(
     State(state): State<AppState>,
     user: AuthUser,
@@ -186,8 +200,12 @@ pub(crate) async fn create_user(
 
     if let Some(pw) = req.password {
         if !pw.is_empty() {
-            let hash = infra::password::hash_password(&pw)
-                .map_err(|_| error::internal("password hash error"))?;
+            let hash = infra::password::hash_password(&pw).map_err(|e| {
+                error::with_context(
+                    error::internal("password hash error"),
+                    serde_json::json!({ "op": "hash_password", "err": e.to_string() }),
+                )
+            })?;
             repo::credentials::insert(&mut *tx, user_id, hash)
                 .await
                 .map_err(|e| {
@@ -206,6 +224,15 @@ pub(crate) async fn create_user(
         )
     })?;
 
+    tracing::info!(
+        op = "users.create",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        target_user_id = %row.id,
+        row_version = row.row_version,
+        "api response"
+    );
+
     Ok(ApiResponse::ok(user_row_to_view(row)))
 }
 
@@ -219,6 +246,7 @@ pub(crate) async fn create_user(
     tag = "Users",
     responses((status = 200, description = "查询用户详情"))
 )]
+#[tracing::instrument(level = "info", name = "api.users.get", skip(state, user), fields(op = "users.get", actor_user_id = %user.user_id, target_user_id = %id), err)]
 pub(crate) async fn get_user(
     State(state): State<AppState>,
     user: AuthUser,
@@ -237,6 +265,15 @@ pub(crate) async fn get_user(
         })?
         .ok_or_else(|| error::not_found("user not found"))?;
 
+    tracing::info!(
+        op = "users.get",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        target_user_id = %row.id,
+        row_version = row.row_version,
+        "api response"
+    );
+
     Ok(ApiResponse::ok(user_row_to_view(row)))
 }
 
@@ -251,6 +288,7 @@ pub(crate) async fn get_user(
     request_body = UpdateUserBody,
     responses((status = 200, description = "更新用户"))
 )]
+#[tracing::instrument(level = "info", name = "api.users.update", skip(state, user, req), fields(op = "users.update", actor_user_id = %user.user_id, target_user_id = %id), err)]
 pub(crate) async fn update_user(
     State(state): State<AppState>,
     user: AuthUser,
@@ -280,6 +318,15 @@ pub(crate) async fn update_user(
     })?
     .ok_or_else(|| error::conflict("row_version mismatch or user not found"))?;
 
+    tracing::info!(
+        op = "users.update",
+        trace_id = gz_observe::current_trace_id(),
+        status_code = 200,
+        target_user_id = %updated.id,
+        row_version = updated.row_version,
+        "api response"
+    );
+
     Ok(ApiResponse::ok(user_row_to_view(updated)))
 }
 
@@ -294,6 +341,7 @@ pub(crate) async fn update_user(
     request_body = DeleteUserBody,
     responses((status = 200, description = "删除用户（软删除）"))
 )]
+#[tracing::instrument(level = "info", name = "api.users.delete", skip(state, user, req), fields(op = "users.delete", actor_user_id = %user.user_id, target_user_id = %id), err)]
 pub(crate) async fn delete_user(
     State(state): State<AppState>,
     user: AuthUser,
@@ -313,6 +361,13 @@ pub(crate) async fn delete_user(
         })?;
 
     if ok {
+        tracing::info!(
+            op = "users.delete",
+            trace_id = gz_observe::current_trace_id(),
+            status_code = 200,
+            target_user_id = %id,
+            "api response"
+        );
         Ok(ApiResponse::<()>::empty_ok())
     } else {
         Err(error::conflict("row_version mismatch or user not found"))
@@ -344,12 +399,12 @@ fn map_insert_user_error(e: sqlx::Error) -> gz_web::AppError {
             }
             error::with_context(
                 error::internal("db error"),
-                serde_json::json!({ "err": e.to_string() }),
+                serde_json::json!({ "op": "insert_user", "db_code": code, "err": e.to_string() }),
             )
         }
         _ => error::with_context(
             error::internal("db error"),
-            serde_json::json!({ "err": e.to_string() }),
+            serde_json::json!({ "op": "insert_user", "err": e.to_string() }),
         ),
     }
 }

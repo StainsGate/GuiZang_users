@@ -96,6 +96,7 @@ pub fn router() -> Router<AppState> {
     )
 )]
 /// 简单连通性检查接口。
+#[tracing::instrument(level = "info", name = "api.system.ping", fields(op = "system.ping"))]
 async fn ping() -> ApiResponse<&'static str> {
     ApiResponse::ok("pong")
 }
