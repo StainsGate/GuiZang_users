@@ -194,6 +194,7 @@ docker compose down
 1. 启动服务并开启 OTEL（PowerShell）：
 
 ```powershell
+$env:RUST_LOG = "info,sqlx=debug,sqlx::query=trace,sqlx_postgres=debug"
 cargo run
 ```
 
@@ -208,3 +209,4 @@ cargo run
 
 - `seed_rbac` 会创建 `admin` 角色并绑定基础权限。
 - 首个注册用户会被自动赋予 `admin` 角色（用于系统自举）。
+

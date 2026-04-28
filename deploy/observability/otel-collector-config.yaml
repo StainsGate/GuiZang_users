@@ -1,0 +1,88 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 200
+    spike_limit_mib: 50
+
+  batch: {}
+
+  # ✅ 统一资源标签（最重要）
+  resource/add_env:
+    attributes:
+      - key: deployment.environment
+        action: upsert
+        value: ${env:APP_ENV}
+
+  resource/add_service:
+    attributes:
+      - key: service.name
+        action: insert
+        value: ${env:SERVICE_NAME}
+
+  # ✅ 清理敏感信息
+  attributes/redact:
+    actions:
+      - key: password
+        action: delete
+      - key: secret
+        action: delete
+      - key: token
+        action: delete
+      - key: authorization
+        action: delete
+
+  # ✅ 控制 Loki label（核心修改点）
+  transform/loki_labels:
+    log_statements:
+      - context: resource
+        statements:
+          - set(resource.attributes["loki.resource.labels"], "service.name,deployment.environment")
+      - context: log
+        statements:
+          - set(log.attributes["loki.attribute.labels"], "log.level,http.method")
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/add_env, resource/add_service, batch]
+      exporters: [otlp_grpc/tempo]
+
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/add_env, resource/add_service, batch]
+      exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors:
+        [
+          memory_limiter,
+          resource/add_env,
+          resource/add_service,
+          attributes/redact,
+          transform/loki_labels,
+          batch
+        ]
+      exporters: [otlp_http/loki]
+
+exporters:
+  otlp_grpc/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # ✅ 继续使用 OTLP 推给 Loki（推荐方式）
+  otlp_http/loki:
+    endpoint: http://loki:3100/otlp
+
+  prometheus:
+    endpoint: 0.0.0.0:9464
